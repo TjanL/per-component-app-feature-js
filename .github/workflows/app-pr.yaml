@@ -1,0 +1,43 @@
+name: Build App on PR
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_APP: tjanl/app-${{ github.event.repository.name }}
+
+jobs:
+  build-app-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHRC_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_APP }}
+
+      - name: Build Docker image with SHA tag
+        uses: docker/build-push-action@v5
+        with:
+          context: app
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_APP }}:${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            API_HOST=http://${{ secrets.TS_NODE_IP }}:8000
+            COMMIT=${{ github.sha }}
